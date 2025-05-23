@@ -1,0 +1,254 @@
+import java.sql.*;
+import java.util.Scanner;
+
+public class LibraryManagement {
+
+    static Connection con;
+    static PreparedStatement pst;
+    static Scanner sc = new Scanner(System.in);
+
+    public static void main(String[] args) {
+        connectDatabase();
+        createTables();
+        login();
+    }
+
+    static void connectDatabase() {
+        try {
+            con = DriverManager.getConnection("jdbc:mysql://localhost:3306/", "root", "9634");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    static void createTables() {
+        try {
+            Statement st = con.createStatement();
+            st.executeUpdate("CREATE DATABASE IF NOT EXISTS LIBRARYMANAGEMENT");
+            st.execute("USE LIBRARYMANAGEMENT");
+
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS books(bname VARCHAR(20), bcode INT, total INT, subject VARCHAR(20))");
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS issue(name VARCHAR(20) NOT NULL, phoneno VARCHAR(20) NOT NULL, regno INT NOT NULL, bcode INT NOT NULL, issue VARCHAR(20) NOT NULL)");
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS submit(name VARCHAR(20) NOT NULL, phoneno VARCHAR(10) NOT NULL, regno INT NOT NULL, bcode INT NOT NULL, submit DATE NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)");
+
+            System.out.println("DATABASE AND TABLES CREATED SUCCESSFULLY");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    static void login() {
+        System.out.print("Enter Password: ");
+        String pswd = sc.nextLine();
+        if (pswd.equals("9634")) {
+            menu();
+        } else {
+            System.out.println("Wrong Password");
+        }
+    }
+
+    static void menu() {
+        while (true) {
+            System.out.println("""
+                ==========================================================================
+
+                                 LIBRARY MANAGEMENT
+
+                1. ADD BOOK
+                2. ISSUE BOOK
+                3. SUBMIT BOOK
+                4. DISPLAY BOOKS
+                5. DELETE BOOK
+                6. ISSUE INFORMATION
+                7. SUBMIT INFORMATION
+                8. EXIT
+
+                ===========================================================================
+            """);
+
+            System.out.print("Enter Task Number: ");
+            String choice = sc.nextLine();
+
+            switch (choice) {
+                case "1" -> addBook();
+                case "2" -> issueBook();
+                case "3" -> submitBook();
+                case "4" -> displayBooks();
+                case "5" -> deleteBook();
+                case "6" -> issueInfo();
+                case "7" -> submitInfo();
+                case "8" -> System.exit(0);
+                default -> System.out.println("Wrong Choice");
+            }
+        }
+    }
+
+    static void addBook() {
+        try {
+            System.out.print("Enter Book Name: ");
+            String name = sc.nextLine();
+            System.out.print("Enter Book Code: ");
+            int code = Integer.parseInt(sc.nextLine());
+            System.out.print("Enter Total Books: ");
+            int total = Integer.parseInt(sc.nextLine());
+            System.out.print("Enter Subject: ");
+            String subject = sc.nextLine();
+
+            pst = con.prepareStatement("INSERT INTO books VALUES (?, ?, ?, ?)");
+            pst.setString(1, name);
+            pst.setInt(2, code);
+            pst.setInt(3, total);
+            pst.setString(4, subject);
+            pst.executeUpdate();
+
+            System.out.println("Data Entered Successfully");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    static void issueBook() {
+        try {
+            System.out.print("Enter Student Name: ");
+            String name = sc.nextLine();
+            System.out.print("Enter Phone Number: ");
+            String phone = sc.nextLine();
+            System.out.print("Enter Reg No: ");
+            int reg = Integer.parseInt(sc.nextLine());
+            System.out.print("Enter Book Code: ");
+            int code = Integer.parseInt(sc.nextLine());
+            System.out.print("Enter Issue Date: ");
+            String date = sc.nextLine();
+
+            pst = con.prepareStatement("INSERT INTO issue VALUES (?, ?, ?, ?, ?)");
+            pst.setString(1, name);
+            pst.setString(2, phone);
+            pst.setInt(3, reg);
+            pst.setInt(4, code);
+            pst.setString(5, date);
+            pst.executeUpdate();
+
+            updateBookCount(code, -1);
+            System.out.println("Book Issued To: " + name);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    static void submitBook() {
+        try {
+            System.out.print("Enter Student Name: ");
+            String name = sc.nextLine();
+            System.out.print("Enter Phone Number: ");
+            String phone = sc.nextLine();
+            System.out.print("Enter Reg No: ");
+            int reg = Integer.parseInt(sc.nextLine());
+            System.out.print("Enter Book Code: ");
+            int code = Integer.parseInt(sc.nextLine());
+            System.out.print("Enter Issue Date: ");
+            String issueDate = sc.nextLine();
+
+            pst = con.prepareStatement("INSERT INTO issue VALUES (?, ?, ?, ?, ?)");
+            pst.setString(1, name);
+            pst.setString(2, phone);
+            pst.setInt(3, reg);
+            pst.setInt(4, code);
+            pst.setString(5, issueDate);
+            pst.executeUpdate();
+
+            System.out.print("Enter Last Day of Submit: ");
+            String lastDate = sc.nextLine();
+            if (issueDate.compareTo(lastDate) <= 0) {
+                System.out.println("No fine");
+            } else {
+                System.out.println("100 rs Fine");
+            }
+
+            updateBookCount(code, 1);
+            System.out.println("Book Submitted from: " + name);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    static void updateBookCount(int code, int delta) {
+        try {
+            pst = con.prepareStatement("SELECT total FROM books WHERE bcode = ?");
+            pst.setInt(1, code);
+            ResultSet rs = pst.executeQuery();
+            if (rs.next()) {
+                int total = rs.getInt("total") + delta;
+                pst = con.prepareStatement("UPDATE books SET total = ? WHERE bcode = ?");
+                pst.setInt(1, total);
+                pst.setInt(2, code);
+                pst.executeUpdate();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    static void displayBooks() {
+        try {
+            pst = con.prepareStatement("SELECT * FROM books");
+            ResultSet rs = pst.executeQuery();
+            while (rs.next()) {
+                System.out.println("Book Name: " + rs.getString("bname"));
+                System.out.println("Book Code: " + rs.getInt("bcode"));
+                System.out.println("Total: " + rs.getInt("total"));
+                System.out.println("---------------------------");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    static void deleteBook() {
+        try {
+            System.out.print("Enter Book Code: ");
+            int code = Integer.parseInt(sc.nextLine());
+
+            pst = con.prepareStatement("DELETE FROM books WHERE bcode = ?");
+            pst.setInt(1, code);
+            pst.executeUpdate();
+
+            System.out.println("Book Deleted Successfully");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    static void issueInfo() {
+        try {
+            pst = con.prepareStatement("SELECT * FROM issue");
+            ResultSet rs = pst.executeQuery();
+            while (rs.next()) {
+                System.out.println("Student Name: " + rs.getString("name"));
+                System.out.println("Phone Number: " + rs.getString("phoneno"));
+                System.out.println("Reg No: " + rs.getInt("regno"));
+                System.out.println("Book Code: " + rs.getInt("bcode"));
+                System.out.println("Issue Date: " + rs.getString("issue"));
+                System.out.println("---------------------------");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    static void submitInfo() {
+        try {
+            pst = con.prepareStatement("SELECT * FROM issue"); // Should ideally be 'submit' table if it's distinct
+            ResultSet rs = pst.executeQuery();
+            while (rs.next()) {
+                System.out.println("Student Name: " + rs.getString("name"));
+                System.out.println("Phone Number: " + rs.getString("phoneno"));
+                System.out.println("Reg No: " + rs.getInt("regno"));
+                System.out.println("Book Code: " + rs.getInt("bcode"));
+                System.out.println("Submit Date: " + rs.getString("issue"));
+                System.out.println("---------------------------");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
